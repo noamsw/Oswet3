@@ -1,6 +1,6 @@
 #include "segel.h"
 #include "request.h"
-
+#define CMDLINE 200
 // 
 // server.c: A very, very simple web server
 //
@@ -12,23 +12,34 @@
 //
 
 // HW3: Parse the new arguments too
-void getargs(int *port, int argc, char *argv[])
+void getargs(int *port, int *threads, int *queue_size, int argc, char* schedalg, char *argv[])
 {
     if (argc < 2) {
-	fprintf(stderr, "Usage: %s <port>\n", argv[0]);
+	fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
 	exit(1);
     }
     *port = atoi(argv[1]);
+    *threads = atoi(argv[2]);
+    *queue_size = atoi(argv[3]);
+    strcpy(schedalg, argv[4]);
+
 }
 
 
 int main(int argc, char *argv[])
 {
-    int listenfd, connfd, port, clientlen;
+    cond_t c;
+    mutex_t m;
+    int cur_queue_size = 0;
+    int listenfd, connfd, port, threads_num, queue_size, clientlen;
+    char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
 
-    getargs(&port, argc, argv);
-
+    getargs(&port, &threads_num, &queue_size, argc, argv);
+    pthread_t threads[threads_num];
+    for(int i=0; i<threads_num; i++){
+        pthread_create(&threads[i], NULL, thread_function, NULL);
+    }
     // 
     // HW3: Create some threads...
     //
