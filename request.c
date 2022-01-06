@@ -5,6 +5,8 @@
 #include "segel.h"
 #include "request.h"
 
+checking commit
+
 // requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
 void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg) 
 {
