@@ -2,38 +2,40 @@
 #include "request.h"
 
 #define CMDLINE 200
-pthread_cond_t* work_c;
-pthread_cond_t* queue_c;
+pthread_cond_t work_c;
+pthread_cond_t queue_c;
 pthread_mutex_t m;
 int cur_queue_size = 0;
 
-//queue implemetaion:
+// queue implementation:
 typedef struct node{
     struct node *next;
-    int *client_socket;
-}node_t;
-node_t* head = NULL;
-node_t* tail = NULL;
-void enqueue(int *client_socket){
-    node_t *newnode = malloc(sizeof(node_t));
-    newnode->client_socket = client_socket;
-    newnode->next = NULL;
+    int client_socket;
+}*node_t;
+node_t head = NULL;
+node_t tail = NULL;
+void enqueue(int client_socket){
+    node_t new_node = malloc(sizeof(node_t));
+    new_node->client_socket = client_socket;
+    new_node->next = NULL;
     if (tail == NULL){
-        head = newnode;
+        head = new_node;
     }else{
-        tail->next = newnode;
+        tail->next = new_node;
     }
     cur_queue_size ++;
-    tail = newnode;
+    tail = new_node;
 }
-//returns NULL if the queue is empty
-//returns the pointer to a client_socket if there is one
-int* dequeue(){
+
+// removes first element (Head)
+// returns -1 if the queue is empty
+// returns the client_socket if there is one
+int dequeue(){
     if(head == NULL){
-        return NULL;
+        return -1;
     }else{
-        int *result = head->client_socket;
-        node_t *tmp = head;
+        int result = head->client_socket;
+        node_t tmp = head;
         head = head->next;
         if(head ==  NULL){tail = NULL;}
         free(tmp);
@@ -41,6 +43,8 @@ int* dequeue(){
         return(result);
     }
 }
+
+// randomly remove 50% of the queue
 void randomRemove()
 {
     int* histogram_to_remove = malloc(cur_queue_size*sizeof(int));
@@ -61,24 +65,22 @@ void randomRemove()
         }
     }
 
-    node_t* prev = head;
-    node_t* cur = head;
+    node_t prev = head;
+    node_t cur = head;
     for(int i = 0 ; i < cur_queue_size ; i++)
     {
         if(histogram_to_remove[i]==1)
         {
             if (cur == head)
             {
-                node_t* tmp = head;
+                node_t tmp = head;
                 head = head->next;
-                free(tmp->client_socket);
                 free(tmp);
                 continue;
             }
-            node_t* tmp = cur;
+            node_t tmp = cur;
             prev->next = cur->next;
             cur = cur->next;
-            free(tmp->client_socket);
             free(tmp);
             continue;
         }
@@ -91,23 +93,26 @@ void randomRemove()
             cur = cur->next;
         }
     }
+    free(histogram_to_remove);
 };
+
+// each thread activates this function for one request at a time
 void* thread_function(void *arg){
     while (1){
-        int *pclient;
+        int pclient;
         pthread_mutex_lock(&m);
-        while((pclient = dequeue()) == NULL){
+        while((pclient = dequeue()) == -1){
             pthread_cond_wait(&work_c, &m);
         }
         pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
-        int fd = *pclient;
-        free(pclient);
+        int fd = pclient;
         requestHandle(fd);
         Close(fd);
     }
 }
-// HW3: Parse the new arguments too
+
+// Parsing the arguments
 void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc, char *argv[])
 {
     if (argc != 5) {
@@ -120,13 +125,13 @@ void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc,
     strcpy(schedalg, argv[4]);
 }
 
-
 int main(int argc, char *argv[])
 {
     // for some reason, init didnt work outside..
-    pthread_cond_init(work_c, NULL);
-    pthread_cond_init(queue_c, NULL);
+    pthread_cond_init(&work_c, NULL);
+    pthread_cond_init(&queue_c, NULL);
     pthread_mutex_init(&m, NULL);
+
     int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
@@ -144,11 +149,13 @@ int main(int argc, char *argv[])
     {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-    int *pfd = malloc(sizeof (int));
-    *pfd = connfd;
+    // int *pfd = malloc(sizeof (int));
+    int pfd = connfd;
 
     pthread_mutex_lock(&m);
-    if(cur_queue_size == max_queue_size) // different policies
+
+    // need to recheck definition of Size
+    if(cur_queue_size == max_queue_size) // different policies.
     {
         if(strcmp(schedalg, "block") == 0)
         {
@@ -156,16 +163,12 @@ int main(int argc, char *argv[])
         }
         else if(strcmp(schedalg, "drop_head") == 0)
         {
-            int* to_free;
-            to_free = dequeue();
-            free(to_free);
+            dequeue();
         }
         else if(strcmp(schedalg, "drop_random") == 0)
         {
-
+            randomRemove();
         }
-
-
     }
 
     enqueue(pfd);
