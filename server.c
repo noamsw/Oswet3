@@ -51,6 +51,57 @@ int* dequeue(){
         return(result);
     }
 }
+void randomRemove()
+{
+    int* histogram_to_remove = malloc(cur_queue_size*sizeof(int));
+    for (int i=0; i<cur_queue_size ; i++)
+    {
+        histogram_to_remove[i]=0;
+    }
+    int amount_to_remove = cur_queue_size/2 + cur_queue_size%2;
+    srand(cur_queue_size);
+    while(amount_to_remove > 0)
+    {
+        int index = rand();
+        index = index%cur_queue_size;
+        if(histogram_to_remove[index] == 0)
+        {
+            histogram_to_remove[index] = 1;
+            amount_to_remove--;
+        }
+    }
+
+    node_t* prev = head;
+    node_t* cur = head;
+    for(int i = 0 ; i < cur_queue_size ; i++)
+    {
+        if(histogram_to_remove[i]==1)
+        {
+            if (cur == head)
+            {
+                node_t* tmp = head;
+                head = head->next;
+                free(tmp->client_socket);
+                free(tmp);
+                continue;
+            }
+            node_t* tmp = cur;
+            prev->next = cur->next;
+            cur = cur->next;
+            free(tmp->client_socket);
+            free(tmp);
+            continue;
+        }
+        else
+        {
+            if(cur != head)
+            {
+                prev = prev->next;
+            }
+            cur = cur->next;
+        }
+    }
+};
 void* thread_function(void *arg){
     while (true){
         int *pclient;
@@ -77,48 +128,56 @@ void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc,
     *threads = atoi(argv[2]);
     *queue_size = atoi(argv[3]);
     strcpy(schedalg, argv[4]);
-
 }
 
 
 int main(int argc, char *argv[])
 {
-
     int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
 
-    getargs(&port, &threads_num, &queue_size, argc, argv);
+    getargs(&port, &threads_num, &max_queue_size, schedalg, argc, argv);
     pthread_t threads[threads_num];
     for(int i=0; i<threads_num; i++){
         pthread_create(&threads[i], NULL, thread_function, NULL);
     }
-    // 
-    // HW3: Create some threads...
-    //
 
     listenfd = Open_listenfd(port);
-    while (1) {
+
+    // while (1) {
+    for(int i = 0 ; i < 100; i++)
+    {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
     int *pfd = malloc(sizeof (int));
     *pfd = connfd;
-	// 
-	// HW3: In general, don't handle the request in the main thread.
-	// Save the relevant info in a buffer and have one of the worker threads 
-	// do the work. 
-	// 
+
     pthread_mutex_lock(&m);
-    if(cur_queue_size >= max_queue_size){ // an if is enough here as only the main thread can enqueue
-        pthread_cond_wait(&queue_c, &m);
+    if(cur_queue_size == max_queue_size) // different policies
+    {
+        if(strcmp(schedalg, "block") == 0)
+        {
+            pthread_cond_wait(&queue_c, &m);
+        }
+        else if(strcmp(schedalg, "drop_head") == 0)
+        {
+            int* to_free;
+            to_free = dequeue();
+            free(to_free);
+        }
+        else if(strcmp(schedalg, "drop_random") == 0)
+        {
+
+        }
+
+
     }
+
     enqueue(pfd);
     pthread_cond_signal(&work_c);
     pthread_mutex_unlock(&m);
-
-
     }
-
 }
 
 
