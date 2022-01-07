@@ -1,22 +1,12 @@
 #include "segel.h"
 #include "request.h"
+
 #define CMDLINE 200
-pthread_cond_t work_c;
-pthread_cond_t queue_c;
+pthread_cond_t* work_c;
+pthread_cond_t* queue_c;
 pthread_mutex_t m;
-pthread_cond_init(&work_c, NULL);
-pthread_cond_init(&queue_c, NULL);
-pthread_mutex_init(&m, NULL);
 int cur_queue_size = 0;
-//
-// server.c: A very, very simple web server
-//
-// To run:
-//  ./server <portnum (above 2000)>
-//
-// Repeatedly handles HTTP requests sent to this port number.
-// Most of the work is done within routines written in request.c
-//
+
 //queue implemetaion:
 typedef struct node{
     struct node *next;
@@ -103,7 +93,7 @@ void randomRemove()
     }
 };
 void* thread_function(void *arg){
-    while (true){
+    while (1){
         int *pclient;
         pthread_mutex_lock(&m);
         while((pclient = dequeue()) == NULL){
@@ -133,6 +123,10 @@ void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc,
 
 int main(int argc, char *argv[])
 {
+    // for some reason, init didnt work outside..
+    pthread_cond_init(work_c, NULL);
+    pthread_cond_init(queue_c, NULL);
+    pthread_mutex_init(&m, NULL);
     int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
@@ -145,8 +139,8 @@ int main(int argc, char *argv[])
 
     listenfd = Open_listenfd(port);
 
-    // while (1) {
-    for(int i = 0 ; i < 100; i++)
+    while (1)
+    // for(int i = 0 ; i < 100; i++)
     {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
@@ -179,9 +173,3 @@ int main(int argc, char *argv[])
     pthread_mutex_unlock(&m);
     }
 }
-
-
-    
-
-
- 
