@@ -17,10 +17,10 @@ typedef struct node{
 }node_t;
 node_t* head = NULL;
 node_t* tail = NULL;
-void enque(int *client_socket){
+void enqueue(int *client_socket){
     node_t *newnode = malloc(sizeof(node_t));
     newnode->client_socket = client_socket;
-    newnode->new = NULL;
+    newnode->next = NULL;
     if (tail == NULL){
         head = newnode;
     }else{
@@ -30,7 +30,7 @@ void enque(int *client_socket){
 }
 //returns NULL if the queue is empty
 //returns the pointer to a client_socket if there is one
-int* dequeeu{
+int* dequeu(){
     if(head == NULL){
         return NULL;
     }else{
@@ -45,7 +45,7 @@ int* dequeeu{
 // HW3: Parse the new arguments too
 void getargs(int *port, int *threads, int *queue_size, int argc, char* schedalg, char *argv[])
 {
-    if (argc < 2) {
+    if (argc != 5) {
 	fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
 	exit(1);
     }
@@ -59,8 +59,10 @@ void getargs(int *port, int *threads, int *queue_size, int argc, char* schedalg,
 
 int main(int argc, char *argv[])
 {
-    cond_t c;
-    mutex_t m;
+    pthread_cond_t c;
+    pthread_mutex_t m;
+    pthread_mutex_init(&m, NULL);
+
     int cur_queue_size = 0;
     int listenfd, connfd, port, threads_num, queue_size, clientlen;
     char schedalg[CMDLINE];
