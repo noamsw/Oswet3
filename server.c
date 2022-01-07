@@ -1,7 +1,14 @@
 #include "segel.h"
 #include "request.h"
 #define CMDLINE 200
-// 
+pthread_cond_t work_c;
+pthread_cond_t queue_c;
+pthread_mutex_t m;
+pthread_cond_init(&work_c, NULL);
+pthread_cond_init(&queue_c, NULL);
+pthread_mutex_init(&m, NULL);
+int cur_queue_size = 0;
+//
 // server.c: A very, very simple web server
 //
 // To run:
@@ -26,11 +33,12 @@ void enqueue(int *client_socket){
     }else{
         tail->next = newnode;
     }
+    cur_queue_size ++;
     tail = newnode;
 }
 //returns NULL if the queue is empty
 //returns the pointer to a client_socket if there is one
-int* dequeu(){
+int* dequeue(){
     if(head == NULL){
         return NULL;
     }else{
@@ -39,11 +47,27 @@ int* dequeu(){
         head = head->next;
         if(head ==  NULL){tail = NULL;}
         free(tmp);
+        cur_queue_size --;
         return(result);
     }
 }
+void* thread_function(void *arg){
+    while (true){
+        int *pclient;
+        pthread_mutex_lock(&m);
+        while((pclient = dequeue()) == NULL){
+            pthread_cond_wait(&work_c, &m);
+        }
+        pthread_cond_signal(&queue_c);
+        pthread_mutex_unlock(&m);
+        int fd = *pclient;
+        free(pclient);
+        requestHandle(fd);
+        Close(fd);
+    }
+}
 // HW3: Parse the new arguments too
-void getargs(int *port, int *threads, int *queue_size, int argc, char* schedalg, char *argv[])
+void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc, char *argv[])
 {
     if (argc != 5) {
 	fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
@@ -59,12 +83,8 @@ void getargs(int *port, int *threads, int *queue_size, int argc, char* schedalg,
 
 int main(int argc, char *argv[])
 {
-    pthread_cond_t c;
-    pthread_mutex_t m;
-    pthread_mutex_init(&m, NULL);
 
-    int cur_queue_size = 0;
-    int listenfd, connfd, port, threads_num, queue_size, clientlen;
+    int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
 
@@ -81,15 +101,22 @@ int main(int argc, char *argv[])
     while (1) {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-
+    int *pfd = malloc(sizeof (int));
+    *pfd = connfd;
 	// 
 	// HW3: In general, don't handle the request in the main thread.
 	// Save the relevant info in a buffer and have one of the worker threads 
 	// do the work. 
 	// 
-	requestHandle(connfd);
+    pthread_mutex_lock(&m);
+    if(cur_queue_size >= max_queue_size){ // an if is enough here as only the main thread can enqueue
+        pthread_cond_wait(&queue_c, &m);
+    }
+    enqueue(pfd);
+    pthread_cond_signal(&work_c);
+    pthread_mutex_unlock(&m);
 
-	Close(connfd);
+
     }
 
 }
