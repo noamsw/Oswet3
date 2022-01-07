@@ -1,3 +1,6 @@
 *.o
 *.txt
+favicon.ico
+home.html
+output.cgi
 #comment
