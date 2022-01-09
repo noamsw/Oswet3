@@ -7,16 +7,23 @@ pthread_cond_t queue_c;
 pthread_mutex_t m;
 int cur_queue_size = 0;
 
+// a node tuple, contains the clients socket and time received
+typedef struct tuple{
+    int client_socket;
+    struct timeval time_received;
+}*tuple_t;
 // queue implementation:
 typedef struct node{
     struct node *next;
-    int client_socket;
+    tuple_t tup;
 }*node_t;
+
 node_t head = NULL;
 node_t tail = NULL;
-void enqueue(int client_socket){
+
+void enqueue(tuple_t tup){
     node_t new_node = malloc(sizeof(node_t));
-    new_node->client_socket = client_socket;
+    new_node->tup = tup;
     new_node->next = NULL;
     if (tail == NULL){
         head = new_node;
@@ -30,17 +37,18 @@ void enqueue(int client_socket){
 // removes first element (Head)
 // returns -1 if the queue is empty
 // returns the client_socket if there is one
-int dequeue(){
+//this need to be updated to reutn a tuple.
+tuple_t dequeue(){
     if(head == NULL){
-        return -1;
+        return NULL;
     }else{
-        int result = head->client_socket;
+        tuple_t tup = head->tup;
         node_t tmp = head;
         head = head->next;
         if(head ==  NULL){tail = NULL;}
         free(tmp);
         cur_queue_size --;
-        return(result);
+        return(tup);
     }
 }
 
@@ -75,18 +83,22 @@ void randomRemove()
             {
                 node_t tmp = head;
                 head = head->next;
+                free(tmp->tup);
                 free(tmp);
+                cur = head; //need to advance cur and prev if we erased the head
+                prev = head;
                 continue;
             }
             node_t tmp = cur;
             prev->next = cur->next;
             cur = cur->next;
+            free(tmp->tup);
             free(tmp);
             continue;
         }
         else
         {
-            if(cur != head)
+            if(cur != head) //if cur is head, than we advance only cur, else advance both, this if is a little unintuitive
             {
                 prev = prev->next;
             }
@@ -98,16 +110,30 @@ void randomRemove()
 
 // each thread activates this function for one request at a time
 void* thread_function(void *arg){
+    int num_requests = 0;
+    int num_stat = 0;
+    int num_dyn = 0;
+    struct timeval time_dispatched;
+    pid_t  t_id = gettid();
     while (1){
-        int pclient;
+        tuple_t tup;
         pthread_mutex_lock(&m);
-        while((pclient = dequeue()) == -1){
+        while((tup = dequeue()) == NULL){
             pthread_cond_wait(&work_c, &m);
         }
+        gettimeofday(&time_dispatched, NULL); //should we check if worked?
         pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
-        int fd = pclient;
-        requestHandle(fd);
+        int fd = tup->client_socket;
+        stat_t stat;
+        stat->time_received = tup->time_received;
+        stat->time_dispatched = time_dispatched;
+        stat->num_requests = &num_requests;
+        stat->num_stat = &num_stat;
+        stat->num_dyn = &num_dym;
+        stat->thread_id = t_id;
+        free(tup);
+        requestHandle(fd, stat);
         Close(fd);
     }
 }
@@ -131,7 +157,7 @@ int main(int argc, char *argv[])
     pthread_cond_init(&work_c, NULL);
     pthread_cond_init(&queue_c, NULL);
     pthread_mutex_init(&m, NULL);
-
+    struct timeval time_received;
     int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
@@ -149,9 +175,11 @@ int main(int argc, char *argv[])
     {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+    gettimeofday(&time_received, NULL);
     // int *pfd = malloc(sizeof (int));
-    int pfd = connfd;
-
+    tuple_t tup = malloc(sizeof (tup)); //freed by thread_function
+    tup->client_socket = pfd;
+    tup->time_received = time_received;
     pthread_mutex_lock(&m);
 
     // need to recheck definition of Size
@@ -170,8 +198,7 @@ int main(int argc, char *argv[])
             randomRemove();
         }
     }
-
-    enqueue(pfd);
+    enqueue(tup);
     pthread_cond_signal(&work_c);
     pthread_mutex_unlock(&m);
     }
