@@ -1,6 +1,7 @@
 #include "segel.h"
 #include "request.h"
-
+#include <sys/syscall.h>
+#define _GNU_SOURCE
 #define CMDLINE 200
 pthread_cond_t work_c;
 pthread_cond_t queue_c;
@@ -114,7 +115,7 @@ void* thread_function(void *arg){
     int num_stat = 0;
     int num_dyn = 0;
     struct timeval time_dispatched;
-    pid_t  t_id = gettid();
+    pid_t  t_id = syscall(SYS_gettid);
     while (1){
         tuple_t tup;
         pthread_mutex_lock(&m);
@@ -125,15 +126,15 @@ void* thread_function(void *arg){
         pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
         int fd = tup->client_socket;
-        stat_t stat;
-        stat->time_received = tup->time_received;
-        stat->time_dispatched = time_dispatched;
-        stat->num_requests = &num_requests;
-        stat->num_stat = &num_stat;
-        stat->num_dyn = &num_dym;
-        stat->thread_id = t_id;
+        stat_t stats;   //is this how we should initialize?
+        stats->time_received = tup->time_received;
+        stats->time_dispatched = time_dispatched;
+        stats->num_requests = &num_requests;
+        stats->num_stat = &num_stat;
+        stats->num_dyn = &num_dyn;
+        stats->thread_id = t_id;
         free(tup);
-        requestHandle(fd, stat);
+        requestHandle(fd, stats);
         Close(fd);
     }
 }
@@ -178,7 +179,7 @@ int main(int argc, char *argv[])
     gettimeofday(&time_received, NULL);
     // int *pfd = malloc(sizeof (int));
     tuple_t tup = malloc(sizeof (tup)); //freed by thread_function
-    tup->client_socket = pfd;
+    tup->client_socket = connfd;
     tup->time_received = time_received;
     pthread_mutex_lock(&m);
 
