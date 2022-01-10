@@ -16,15 +16,18 @@ typedef struct tuple{
 // queue implementation:
 typedef struct node{
     struct node *next;
-    tuple_t tup;
+    int client_socket;
+    struct timeval time_received;
 }*node_t;
 
 node_t head = NULL;
 node_t tail = NULL;
 
-void enqueue(tuple_t tup){
+void enqueue(int client_socket, struct timeval *time_received){
     node_t new_node = malloc(sizeof(node_t));
-    new_node->tup = tup;
+    new_node->time_received.tv_sec = time_received->tv_sec;
+    new_node->time_received.tv_usec = time_received->tv_usec;
+    new_node->client_socket = client_socket;
     new_node->next = NULL;
     if (tail == NULL){
         head = new_node;
@@ -38,18 +41,20 @@ void enqueue(tuple_t tup){
 // removes first element (Head)
 // returns -1 if the queue is empty
 // returns the client_socket if there is one
-//this need to be updated to reutn a tuple.
-tuple_t dequeue(){
+//this need to be updated to return a tuple.
+int dequeue(int *client_socket, struct timeval *time_received){
     if(head == NULL){
-        return NULL;
+        return -1;
     }else{
-        tuple_t tup = head->tup;
+        (*client_socket) = head->client_socket;
+        (*time_received).tv_usec = head->time_received.tv_usec;
+        (*time_received).tv_sec = head->time_received.tv_sec;
         node_t tmp = head;
         head = head->next;
         if(head ==  NULL){tail = NULL;}
-        free(tmp);
+        free(tmp);  //is this good?
         cur_queue_size --;
-        return(tup);
+        return(0);
     }
 }
 
@@ -84,7 +89,7 @@ void randomRemove()
             {
                 node_t tmp = head;
                 head = head->next;
-                free(tmp->tup);
+//                free(tmp->tup);
                 free(tmp);
                 cur = head; //need to advance cur and prev if we erased the head
                 prev = head;
@@ -93,7 +98,7 @@ void randomRemove()
             node_t tmp = cur;
             prev->next = cur->next;
             cur = cur->next;
-            free(tmp->tup);
+//            free(tmp->tup);
             free(tmp);
             continue;
         }
@@ -111,29 +116,34 @@ void randomRemove()
 
 // each thread activates this function for one request at a time
 void* thread_function(void *arg){
-    int num_requests = 0;
-    int num_stat = 0;
-    int num_dyn = 0;
+    int fd;
     struct timeval time_dispatched;
+    struct timeval time_elapsed;
+    struct timeval time_received;
     pid_t  t_id = syscall(SYS_gettid);
+    stat_t stats = malloc(sizeof (stat_t)) ;  //is this how we should initialize?
+    stats->num_requests = 0;
+    stats->num_dyn = 0;
+    stats->num_stat = 0;
+    stats->thread_id = t_id;
+//    tuple_t tup;
     while (1){
-        tuple_t tup;
         pthread_mutex_lock(&m);
-        while((tup = dequeue()) == NULL){
+        while(dequeue(&fd, &time_received) == -1){
             pthread_cond_wait(&work_c, &m);
         }
         gettimeofday(&time_dispatched, NULL); //should we check if worked?
         pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
-        int fd = tup->client_socket;
-        stat_t stats;   //is this how we should initialize?
-        stats->time_received = tup->time_received;
-        stats->time_dispatched = time_dispatched;
-        stats->num_requests = &num_requests;
-        stats->num_stat = &num_stat;
-        stats->num_dyn = &num_dyn;
-        stats->thread_id = t_id;
-        free(tup);
+//        timersub(&time_dispatched, &tup->time_received, &time_elapsed);
+        stats->time_received.tv_sec = time_received.tv_usec;
+        stats->time_received.tv_usec = time_received.tv_usec;
+        timersub(&time_dispatched, &time_received, &time_elapsed);
+//        stats->time_received.tv_usec = tup->time_received.tv_usec;
+//        stats->time_received.tv_sec = tup->time_received.tv_sec;
+        stats->time_elapsed.tv_sec = time_elapsed.tv_sec;
+        stats->time_elapsed.tv_usec = time_elapsed.tv_usec;
+//        free(tup);
         requestHandle(fd, stats);
         Close(fd);
     }
@@ -162,7 +172,6 @@ int main(int argc, char *argv[])
     int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
-
     getargs(&port, &threads_num, &max_queue_size, schedalg, argc, argv);
     pthread_t threads[threads_num];
     for(int i=0; i<threads_num; i++){
@@ -178,9 +187,9 @@ int main(int argc, char *argv[])
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
     gettimeofday(&time_received, NULL);
     // int *pfd = malloc(sizeof (int));
-    tuple_t tup = malloc(sizeof (tup)); //freed by thread_function
-    tup->client_socket = connfd;
-    tup->time_received = time_received;
+//    tuple_t tup = malloc(sizeof (tup)); //freed by thread_function
+//    tup->client_socket = connfd;
+//    tup->time_received = time_received;
     pthread_mutex_lock(&m);
 
     // need to recheck definition of Size
@@ -192,14 +201,16 @@ int main(int argc, char *argv[])
         }
         else if(strcmp(schedalg, "drop_head") == 0)
         {
-            dequeue();
+            int n;
+            struct timeval time;
+            dequeue(&n, &time);
         }
         else if(strcmp(schedalg, "drop_random") == 0)
         {
             randomRemove();
         }
     }
-    enqueue(tup);
+    enqueue(connfd, &time_received);
     pthread_cond_signal(&work_c);
     pthread_mutex_unlock(&m);
     }
