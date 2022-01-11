@@ -53,7 +53,7 @@ void clientPrint(int fd)
 
   /* Read and display the HTTP Header */
   n = Rio_readlineb(&rio, buf, MAXBUF);
-  while (strcmp(buf, "\r\n") && (n > 0)) {
+  while (strcmp(buf, "\r\n") && (n > 0)) { //while the line is not a blank line, and we read more than n chars
     printf("Header: %s", buf);
     n = Rio_readlineb(&rio, buf, MAXBUF);
 
@@ -88,7 +88,8 @@ int main(int argc, char *argv[])
 
   /* Open a single connection to the specified host and port */
   clientfd = Open_clientfd(host, port);
-  
+  printf("GET %s HTTP/1.1\n", filename);    //this was printed in segel
+  printf( "host: %s\n\r\n", host); //this was printed in the segel
   clientSend(clientfd, filename);
   clientPrint(clientfd);
     

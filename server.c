@@ -6,7 +6,10 @@
 pthread_cond_t work_c;
 pthread_cond_t queue_c;
 pthread_mutex_t m;
-int cur_queue_size = 0;
+int cur_queue_size = 0; //the maximum amount of requests allowed at any given moment, cur_queue_size+cur_num_jobs <= max_num_jobs
+int cur_num_jobs = 0;
+
+
 
 // a node tuple, contains the clients socket and time received
 typedef struct tuple{
@@ -53,7 +56,7 @@ int dequeue(int *client_socket, struct timeval *time_received){
         head = head->next;
         if(head ==  NULL){tail = NULL;}
         free(tmp);
-//        cur_queue_size --; // make this thread responsibility
+        cur_queue_size --; // decrementing cur_num_jobs is threads responsibility
         return(0);
     }
 }
@@ -93,7 +96,8 @@ void randomRemove()
                 free(tmp);
                 cur = head; //need to advance cur and prev if we erased the head
                 prev = head;
-                cur_queue_size--;
+                cur_queue_size--; //we did not use deque, updating size of queue is our responsibility
+                cur_num_jobs--;
                 continue;
             }
             node_t tmp = cur;
@@ -102,6 +106,7 @@ void randomRemove()
 //            free(tmp->tup);
             free(tmp);
             cur_queue_size--;
+            cur_num_jobs--;
             continue;
         }
         else
@@ -135,7 +140,6 @@ void* thread_function(void *arg){
             pthread_cond_wait(&work_c, &m);
         }
         gettimeofday(&time_dispatched, NULL); //should we check if worked?
-        pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
 //        timersub(&time_dispatched, &tup->time_received, &time_elapsed);
         stats->time_received.tv_sec = time_received.tv_sec;
@@ -151,7 +155,8 @@ void* thread_function(void *arg){
 //        free(tup);
         requestHandle(fd, stats);
         pthread_mutex_lock(&m);
-        cur_queue_size --;  // you should always be able to decrement the size of queue
+        cur_num_jobs--;  // decrement the num of jobs in the system
+        pthread_cond_signal(&queue_c); // if the main thread was waiting, awaken it
         pthread_mutex_unlock(&m);
         Close(fd);
     }
@@ -177,10 +182,10 @@ int main(int argc, char *argv[])
     pthread_cond_init(&queue_c, NULL);
     pthread_mutex_init(&m, NULL);
     struct timeval time_received;
-    int listenfd, connfd, port, threads_num, max_queue_size, clientlen;
+    int listenfd, connfd, port, threads_num, max_num_jobs, clientlen;
     char schedalg[CMDLINE];
     struct sockaddr_in clientaddr;
-    getargs(&port, &threads_num, &max_queue_size, schedalg, argc, argv);
+    getargs(&port, &threads_num, &max_num_jobs, schedalg, argc, argv);
     pthread_t threads[threads_num];
     for(int i=0; i<threads_num; i++){
         pthread_create(&threads[i], NULL, thread_function, NULL);
@@ -201,7 +206,7 @@ int main(int argc, char *argv[])
     pthread_mutex_lock(&m);
 
     // need to recheck definition of Size
-    if(cur_queue_size == max_queue_size) // different policies.
+    if(cur_num_jobs == max_num_jobs) // different policies.
     {
         if(strcmp(schedalg, "block") == 0)
         {
@@ -212,13 +217,13 @@ int main(int argc, char *argv[])
             int n;
             struct timeval time;
             dequeue(&n, &time);
-            cur_queue_size--;
+            cur_num_jobs--;
         }
         else if(strcmp(schedalg, "drop_random") == 0)
         {
             randomRemove();
         }
-    }
+    }//should we check that the args are legitimate?
     enqueue(connfd, &time_received);
     pthread_cond_signal(&work_c);
     pthread_mutex_unlock(&m);
