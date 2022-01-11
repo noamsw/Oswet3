@@ -180,10 +180,8 @@ void requestHandle(int fd, stat_t stats)
    Rio_readinitb(&rio, fd);
    Rio_readlineb(&rio, buf, MAXLINE);
    sscanf(buf, "%s %s %s", method, uri, version);
-//   fprintf(stderr, "Stat-Req-elapsed:: %ld.%06ld\r\n", stats->time_elapsed.tv_sec, stats->time_elapsed.tv_usec); //this is a weird bug
    printf("%s %s %s\n", method, uri, version);
 
-//   fprintf(stderr, "Stat-Req-elapsed:: %ld.%06ld\r\n", stats->time_elapsed.tv_sec, stats->time_elapsed.tv_usec); //this is a weird bug
    if (strcasecmp(method, "GET")) { //unless equal to "get" will return a val not equal to 0, we can only use get
       stats->num_requests++; //increment the number of requests
       requestError(fd, stats, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method");

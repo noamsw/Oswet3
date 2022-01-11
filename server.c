@@ -128,7 +128,8 @@ void* thread_function(void *arg){
     struct timeval time_elapsed;
     struct timeval time_received;
     pid_t  t_id = syscall(SYS_gettid);
-    stat_t stats = malloc(sizeof (stat_t)) ;  //is this how we should initialize, yes
+    // stat_t stats = malloc(sizeof( stat_t)) ;  //is this how we should initialize? NO
+    stat_t stats = malloc(sizeof(*stats)) ;  //is this how we should initialize? yes
     stats->num_requests = 0;
     stats->num_dyn = 0;
     stats->num_stat = 0;
@@ -194,7 +195,6 @@ int main(int argc, char *argv[])
     listenfd = Open_listenfd(port);
 
     while (1)
-    // for(int i = 0 ; i < 100; i++)
     {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
@@ -212,14 +212,14 @@ int main(int argc, char *argv[])
         {
             pthread_cond_wait(&queue_c, &m);
         }
-        else if(strcmp(schedalg, "drop_head") == 0)
+        else if(strcmp(schedalg, "dh") == 0)
         {
             int n;
             struct timeval time;
             dequeue(&n, &time);
             cur_num_jobs--;
         }
-        else if(strcmp(schedalg, "drop_random") == 0)
+        else if(strcmp(schedalg, "random") == 0)
         {
             randomRemove();
         }
