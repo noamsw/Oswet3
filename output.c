@@ -10,7 +10,7 @@
 // handling http requests.
 // 
 
-double spinfor = 5.0;
+double spinfor = 0.2;
 
 void getargs()
 {
@@ -41,8 +41,7 @@ int main(int argc, char *argv[])
   getargs();
 
   double t1 = Time_GetSeconds();
-//  usleep(spinfor * 1e6);
-  usleep(0.2);
+  usleep(spinfor * 1e6);
   double t2 = Time_GetSeconds();
 
   /* Make the response body */
@@ -51,8 +50,8 @@ int main(int argc, char *argv[])
   sprintf(content, "%s<p>I spun for %.2f seconds</p>\r\n", content, t2 - t1);
   
   /* Generate the HTTP response */
-  printf("Content-length: %lu\r\n", strlen(content));
-  printf("Content-type: text/html\r\n\r\n");
+  printf("Header: Content-length: %lu\r\n", strlen(content));
+  printf("Header: Content-type: text/html\r\n\r\n");
   printf("%s", content);
   fflush(stdout);
 
