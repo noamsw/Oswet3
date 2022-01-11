@@ -114,7 +114,7 @@ void requestServeDynamic(int fd, stat_t stats, char *filename, char *cgiargs)
    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, stats->thread_id);
    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, stats->num_requests);
    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, stats->num_stat);
-   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n", buf, stats->num_dyn);
+   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, stats->num_dyn);
    Rio_writen(fd, buf, strlen(buf));
 
    if (Fork() == 0) {
@@ -152,7 +152,7 @@ void requestServeStatic(int fd, stat_t stats, char *filename, int filesize)
    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, stats->thread_id);
    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, stats->num_requests);
    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, stats->num_stat);
-   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n", buf, stats->num_dyn);
+   sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, stats->num_dyn);
    Rio_writen(fd, buf, strlen(buf));
 
    //  Writes out to the client socket the memory-mapped file 
@@ -164,7 +164,6 @@ void requestServeStatic(int fd, stat_t stats, char *filename, int filesize)
 // handle a request
 void requestHandle(int fd, stat_t stats)
 {
-
    int is_static;
    struct stat sbuf;
    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
@@ -174,9 +173,11 @@ void requestHandle(int fd, stat_t stats)
    Rio_readinitb(&rio, fd);
    Rio_readlineb(&rio, buf, MAXLINE);
    sscanf(buf, "%s %s %s", method, uri, version);
+//   fprintf(stderr, "Stat-Req-elapsed:: %ld.%06ld\r\n", stats->time_elapsed.tv_sec, stats->time_elapsed.tv_usec); //this is a weird bug
 
    printf("%s %s %s\n", method, uri, version);
 
+//   fprintf(stderr, "Stat-Req-elapsed:: %ld.%06ld\r\n", stats->time_elapsed.tv_sec, stats->time_elapsed.tv_usec); //this is a weird bug
    if (strcasecmp(method, "GET")) { //unless equal to "get" will return a val not equal to 0, we can only use get
       stats->num_requests++; //increment the number of requests
       requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method");

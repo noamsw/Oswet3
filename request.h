@@ -9,6 +9,6 @@ typedef struct stat_t{
     struct timeval time_elapsed;
 }*stat_t;
 
-void requestHandle(int fd, stat_t stat);// get the strings num of request, static and dynamic by pointer. update them. also revieve the time the thread started working on it and the id
+void requestHandle(int fd, stat_t stats);// get the strings num of request, static and dynamic by pointer. update them. also revieve the time the thread started working on it and the id
 
 #endif

@@ -52,8 +52,8 @@ int dequeue(int *client_socket, struct timeval *time_received){
         node_t tmp = head;
         head = head->next;
         if(head ==  NULL){tail = NULL;}
-        free(tmp);  //is this good?
-        cur_queue_size --;
+        free(tmp);
+//        cur_queue_size --; // make this thread responsibility
         return(0);
     }
 }
@@ -93,6 +93,7 @@ void randomRemove()
                 free(tmp);
                 cur = head; //need to advance cur and prev if we erased the head
                 prev = head;
+                cur_queue_size--;
                 continue;
             }
             node_t tmp = cur;
@@ -100,11 +101,12 @@ void randomRemove()
             cur = cur->next;
 //            free(tmp->tup);
             free(tmp);
+            cur_queue_size--;
             continue;
         }
         else
         {
-            if(cur != head) //if cur is head, than we advance only cur, else advance both, this if is a little unintuitive
+            if(cur != head) //if cur is head, than we advance only cur, else advance both, this if is a little unintuitive, it would be more readable if reversed
             {
                 prev = prev->next;
             }
@@ -121,7 +123,7 @@ void* thread_function(void *arg){
     struct timeval time_elapsed;
     struct timeval time_received;
     pid_t  t_id = syscall(SYS_gettid);
-    stat_t stats = malloc(sizeof (stat_t)) ;  //is this how we should initialize?
+    stat_t stats = malloc(sizeof (stat_t)) ;  //is this how we should initialize, yes
     stats->num_requests = 0;
     stats->num_dyn = 0;
     stats->num_stat = 0;
@@ -136,15 +138,21 @@ void* thread_function(void *arg){
         pthread_cond_signal(&queue_c);
         pthread_mutex_unlock(&m);
 //        timersub(&time_dispatched, &tup->time_received, &time_elapsed);
-        stats->time_received.tv_sec = time_received.tv_usec;
+        stats->time_received.tv_sec = time_received.tv_sec;
         stats->time_received.tv_usec = time_received.tv_usec;
+//        fprintf(stderr, "Stat-Req-Arrival:: %ld.%06ld\r\n", stats->time_received.tv_sec, stats->time_received.tv_usec);
+//        fprintf(stderr, "Stat-Req-Dispatch:: %ld.%06ld\r\n", time_dispatched.tv_sec, time_dispatched.tv_usec);
         timersub(&time_dispatched, &time_received, &time_elapsed);
+//        fprintf(stderr, "Stat-Req-elapsed:: %ld.%06ld\r\n", time_elapsed.tv_sec, time_elapsed.tv_usec);
 //        stats->time_received.tv_usec = tup->time_received.tv_usec;
 //        stats->time_received.tv_sec = tup->time_received.tv_sec;
         stats->time_elapsed.tv_sec = time_elapsed.tv_sec;
         stats->time_elapsed.tv_usec = time_elapsed.tv_usec;
 //        free(tup);
         requestHandle(fd, stats);
+        pthread_mutex_lock(&m);
+        cur_queue_size --;  // you should always be able to decrement the size of queue
+        pthread_mutex_unlock(&m);
         Close(fd);
     }
 }
@@ -204,6 +212,7 @@ int main(int argc, char *argv[])
             int n;
             struct timeval time;
             dequeue(&n, &time);
+            cur_queue_size--;
         }
         else if(strcmp(schedalg, "drop_random") == 0)
         {
