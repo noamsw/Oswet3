@@ -27,7 +27,7 @@ node_t head = NULL;
 node_t tail = NULL;
 
 void enqueue(int client_socket, struct timeval *time_received){
-    node_t new_node = malloc(sizeof(node_t));
+    node_t new_node = malloc(sizeof(*new_node));
     new_node->time_received.tv_sec = time_received->tv_sec;
     new_node->time_received.tv_usec = time_received->tv_usec;
     new_node->client_socket = client_socket;
