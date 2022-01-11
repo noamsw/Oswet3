@@ -6,8 +6,8 @@
 pthread_cond_t work_c;
 pthread_cond_t queue_c;
 pthread_mutex_t m;
-int cur_queue_size = 0; //the maximum amount of requests allowed at any given moment, cur_queue_size+cur_num_jobs <= max_num_jobs
-int cur_num_jobs = 0;
+int cur_queue_size = 0; // curr amount of requests in the queue
+int cur_num_jobs = 0; // amount of requests treated by the threads + queue size
 
 
 
@@ -70,7 +70,7 @@ void randomRemove()
         histogram_to_remove[i]=0;
     }
     int amount_to_remove = cur_queue_size/2 + cur_queue_size%2;
-    srand(cur_queue_size);
+    srand(10);
     while(amount_to_remove > 0)
     {
         int index = rand();
@@ -84,7 +84,8 @@ void randomRemove()
 
     node_t prev = head;
     node_t cur = head;
-    for(int i = 0 ; i < cur_queue_size ; i++)
+    int iter_num = cur_queue_size;
+    for(int i = 0 ; i < iter_num ; i++) // there was a bug here
     {
         if(histogram_to_remove[i]==1)
         {
@@ -157,9 +158,9 @@ void* thread_function(void *arg){
         requestHandle(fd, stats);
         pthread_mutex_lock(&m);
         cur_num_jobs--;  // decrement the num of jobs in the system
+        Close(fd);
         pthread_cond_signal(&queue_c); // if the main thread was waiting, awaken it
         pthread_mutex_unlock(&m);
-        Close(fd);
     }
 }
 
