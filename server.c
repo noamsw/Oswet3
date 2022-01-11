@@ -223,6 +223,12 @@ int main(int argc, char *argv[])
         {
             randomRemove();
         }
+        else if(strcmp(schedalg, "dt") == 0)
+        {
+            Close(connfd);
+            pthread_mutex_unlock(&m);
+            continue;
+        }
     }//should we check that the args are legitimate?
     enqueue(connfd, &time_received);
     pthread_cond_signal(&work_c);
