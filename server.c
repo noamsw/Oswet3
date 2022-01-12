@@ -99,7 +99,7 @@ void randomRemove()
             {
                 node_t tmp = head;
                 head = head->next;
-//                free(tmp->tup);
+                if(head ==  NULL){tail = NULL;}// if the queue was of size 1 it needs to update tail
                 Close(tmp->client_socket);
                 free(tmp);
                 cur = head; //need to advance cur and prev if we erased the head
@@ -111,7 +111,6 @@ void randomRemove()
             node_t tmp = cur;
             prev->next = cur->next;
             cur = cur->next;
-//            free(tmp->tup);
             Close(tmp->client_socket);
             free(tmp);
             cur_queue_size--;
@@ -177,8 +176,8 @@ void* thread_function(void *arg){
 void getargs(int *port, int *threads, int *queue_size, char* schedalg, int argc, char *argv[])
 {
     if (argc != 5) {
-	fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
-	exit(1);
+        fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
+        exit(1);
     }
     *port = atoi(argv[1]);
     *threads = atoi(argv[2]);
@@ -208,51 +207,51 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-	clientlen = sizeof(clientaddr);
-	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-    gettimeofday(&time_received, NULL);
-    // int *pfd = malloc(sizeof (int));
+        clientlen = sizeof(clientaddr);
+        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+        gettimeofday(&time_received, NULL);
+        // int *pfd = malloc(sizeof (int));
 //    tuple_t tup = malloc(sizeof (tup)); //freed by thread_function
 //    tup->client_socket = connfd;
 //    tup->time_received = time_received;
-    pthread_mutex_lock(&m);
+        pthread_mutex_lock(&m);
 
-    // need to recheck definition of Size
-    if(cur_num_jobs == max_num_jobs)
-    {
-        printf("debug: got into policies\n");
-        if(strcmp(schedalg, "block") == 0)
+        // need to recheck definition of Size
+        if(cur_num_jobs == max_num_jobs)
         {
-            while(cur_num_jobs == max_num_jobs)
+            printf("debug: got into policies\n");
+            if(strcmp(schedalg, "block") == 0)
             {
-                pthread_cond_wait(&queue_c, &m);
+                while(cur_num_jobs == max_num_jobs)
+                {
+                    pthread_cond_wait(&queue_c, &m);
+                }
             }
-        }
-        else if(strcmp(schedalg, "dh") == 0)
-        {
-            printf("debug: got into dh\n");
-            int fd_to_close;
-            struct timeval time;
-            dequeue(&fd_to_close, &time);
-            Close(fd_to_close);
-            cur_num_jobs--;
-        }
-        else if(strcmp(schedalg, "random") == 0)
-        {
-            printf("debug: got into random\n");
-            printf("debug: num jobs = %d, max jobs = %d.\n", cur_num_jobs, max_num_jobs);
-            randomRemove();
-        }
-        else if(strcmp(schedalg, "dt") == 0)
-        {
-            printf("debug: got into dt\n");
-            Close(connfd);
-            pthread_mutex_unlock(&m);
-            continue;
-        }
-    }//should we check that the args are legitimate?
-    enqueue(connfd, &time_received);
-    pthread_cond_signal(&work_c);
-    pthread_mutex_unlock(&m);
+            else if(strcmp(schedalg, "dh") == 0)
+            {
+                printf("debug: got into dh\n");
+                int fd_to_close;
+                struct timeval time;
+                dequeue(&fd_to_close, &time);
+                Close(fd_to_close);
+                cur_num_jobs--;
+            }
+            else if(strcmp(schedalg, "random") == 0)
+            {
+                printf("debug: got into random\n");
+                printf("debug: num jobs = %d, max jobs = %d.\n", cur_num_jobs, max_num_jobs);
+                randomRemove();
+            }
+            else if(strcmp(schedalg, "dt") == 0)
+            {
+                printf("debug: got into dt\n");
+                Close(connfd);
+                pthread_mutex_unlock(&m);
+                continue;
+            }
+        }//should we check that the args are legitimate?
+        enqueue(connfd, &time_received);
+        pthread_cond_signal(&work_c);
+        pthread_mutex_unlock(&m);
     }
 }
