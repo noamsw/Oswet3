@@ -66,15 +66,12 @@ int dequeue(int *client_socket, struct timeval *time_received){
 // randomly remove 50% of the queue
 void randomRemove()
 {
-    printf("debug: got into randomRemove\n");
     int* histogram_to_remove = malloc(cur_queue_size*sizeof(int));
     for (int i=0; i<cur_queue_size ; i++)
     {
         histogram_to_remove[i]=0;
     }
-    printf("debug: cur queue size = %d\n", cur_queue_size);
     int amount_to_remove = cur_queue_size/2 + cur_queue_size%2;
-    printf("debug: amount to remove = %d\n", amount_to_remove);
     srand(10);
     while(amount_to_remove > 0)
     {
@@ -94,7 +91,6 @@ void randomRemove()
     {
         if(histogram_to_remove[i]==1)
         {
-            printf("debug: removing the %d node from the queue\n", i);
             if (cur == head)
             {
                 node_t tmp = head;
@@ -229,7 +225,6 @@ int main(int argc, char *argv[])
         // need to recheck definition of Size
         if(cur_num_jobs == max_num_jobs)
         {
-            printf("debug: got into policies\n");
             if(strcmp(schedalg, "block") == 0)
             {
                 while(cur_num_jobs == max_num_jobs)
@@ -239,7 +234,6 @@ int main(int argc, char *argv[])
             }
             else if(strcmp(schedalg, "dh") == 0)
             {
-                printf("debug: got into dh\n");
                 int fd_to_close;
                 struct timeval time;
                 dequeue(&fd_to_close, &time);
@@ -248,13 +242,10 @@ int main(int argc, char *argv[])
             }
             else if(strcmp(schedalg, "random") == 0)
             {
-                printf("debug: got into random\n");
-                printf("debug: num jobs = %d, max jobs = %d.\n", cur_num_jobs, max_num_jobs);
                 randomRemove();
             }
             else if(strcmp(schedalg, "dt") == 0)
             {
-                printf("debug: got into dt\n");
                 Close(connfd);
                 pthread_mutex_unlock(&m);
                 continue;
