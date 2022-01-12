@@ -112,6 +112,10 @@ void randomRemove()
             prev->next = cur->next;
             cur = cur->next;
             Close(tmp->client_socket);
+            if(tail == tmp) // if we removed the last request
+            {
+                tail = prev;
+            }
             free(tmp);
             cur_queue_size--;
             cur_num_jobs--;
