@@ -128,13 +128,14 @@ void* thread_function(void *arg){
     struct timeval time_dispatched;
     struct timeval time_elapsed;
     struct timeval time_received;
-    pid_t  t_id = syscall(SYS_gettid);
     // stat_t stats = malloc(sizeof( stat_t)) ;  //is this how we should initialize? NO
     stat_t stats = malloc(sizeof(*stats)) ;  //is this how we should initialize? yes
     stats->num_requests = 0;
     stats->num_dyn = 0;
     stats->num_stat = 0;
+    int t_id = *((int*)arg);
     stats->thread_id = t_id;
+    free(arg);
 //    tuple_t tup;
     while (1){
         pthread_mutex_lock(&m);
@@ -190,7 +191,9 @@ int main(int argc, char *argv[])
     getargs(&port, &threads_num, &max_num_jobs, schedalg, argc, argv);
     pthread_t threads[threads_num];
     for(int i=0; i<threads_num; i++){
-        pthread_create(&threads[i], NULL, thread_function, NULL);
+        int* thread_num = malloc(sizeof(int));
+        *thread_num = i;
+        pthread_create(&threads[i], NULL, thread_function, (void*)thread_num);
     }
 
     listenfd = Open_listenfd(port);
