@@ -108,6 +108,16 @@ void randomRemove()
                 cur_num_jobs--;
                 continue;
             }
+            if(cur == tail){
+                node_t tmp = cur;
+                prev->next = NULL;
+                tail = prev;
+                Close(tmp->client_socket);
+                free(tmp);
+                cur_queue_size--;
+                cur_num_jobs--;
+                continue;
+            }
             node_t tmp = cur;
             prev->next = cur->next;
             cur = cur->next;
